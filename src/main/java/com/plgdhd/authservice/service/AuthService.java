@@ -54,18 +54,18 @@ public class AuthService {
 //        rateLimitService.checkLoginRateLimit(clientIp);
 
         try{
-            TokenResponse tokens = keycloakUserService.login(request.emailOrUsername(), request.password());
+            TokenResponse tokens = keycloakUserService.login(request.email(), request.password());
 
 //            rateLimitService.resetAttempts(clientIp);
 
-            log.info("Успешный вход: user={}", request.emailOrUsername());
+            log.info("Успешный вход: user={}", request.email());
             return tokens;
         }
         catch (InvalidCredentialsException ex){
 
 //            rateLimitService.recordFailedAttempt(clientIp);
 
-            log.warn("Неудачная попытка входа: user={}",  request.emailOrUsername());
+            log.warn("Неудачная попытка входа: user={}",  request.email());
             throw  ex;
         }
     }

@@ -1,5 +1,6 @@
 package com.plgdhd.authservice.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -25,7 +26,13 @@ public record RegisterRequest(
         // VIEWER — дефолтная роль. Стримером становятся через отдельный процесс.
         @Pattern(regexp = "^(VIEWER|STREAMER)$",
                 message = "Роль должна быть VIEWER или STREAMER")
-        String role
+        String role,
+
+        @JsonProperty("first_name")
+        String firstName,
+
+        @JsonProperty("last_name")
+        String lastName
 
 ) {
 
