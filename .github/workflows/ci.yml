@@ -14,24 +14,19 @@ jobs:
   auth-service-test:
     runs-on: ubuntu-latest
 
-    # services:
-    #   postgres:
-    #     image: postgres:16-alpine
-    #     env:
-    #       POSTGRES_DB: keycloak_test
-    #       POSTGRES_USER: keycloak
-    #       POSTGRES_PASSWORD: keycloak
-    #     ports:
-    #       - 5432:5432
-    #     options: >-
-    #       --health-cmd pg_isready
-    #       --health-interval 10s
-    #       --health-timeout 5s
-    #       --health-retries 5
-
     steps:
-      - name: Checkout code
+      - name: Checkout auth-service
         uses: actions/checkout@v4
+        with:
+          path: auth-service
+
+      - name: Checkout event
+        uses: actions/checkout@v4
+        with:
+          repository: Plgdhd/shine-event
+          path: event
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: master
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -40,28 +35,25 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Cache Maven dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+      - name: Build and install event
+        run: |
+          cd event
+          mvn clean install
 
-      - name: Build & Test with JaCoCo
-        run: mvn -B clean verify
-        #   SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/keycloak_test
-        #   SPRING_DATASOURCE_USERNAME: keycloak
-        #   SPRING_DATASOURCE_PASSWORD: keycloak
+      - name: Build and test auth-service
+        run: |
+          cd auth-service
+          mvn clean verify
 
       - name: Upload JaCoCo Report
         uses: actions/upload-artifact@v4
         with:
           name: auth-service-jacoco-report
-          path: target/site/jacoco/jacoco.xml
+          path: auth-service/target/site/jacoco/jacoco.xml
 
       - name: Upload test reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: target/surefire-reports/
+          path: auth-service/target/surefire-reports/
