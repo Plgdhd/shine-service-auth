@@ -1,0 +1,59 @@
+name: Shine Auth Service CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  auth-service-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout auth-service
+        uses: actions/checkout@v4
+        with:
+          path: auth-service
+
+      - name: Checkout event
+        uses: actions/checkout@v4
+        with:
+          repository: Plgdhd/shine-event
+          path: event
+          token: ${{ secrets.ACCESS_TOKEN }}
+          ref: master
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: maven
+
+      - name: Build and install event
+        run: |
+          cd event
+          mvn clean install
+
+      - name: Build and test auth-service
+        run: |
+          cd auth-service
+          mvn clean verify
+
+      - name: Upload JaCoCo Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-service-jacoco-report
+          path: auth-service/target/site/jacoco/jacoco.xml
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: auth-service/target/surefire-reports/

@@ -84,8 +84,10 @@ public class KeycloakUserService {
         UserRepresentation user = new UserRepresentation();
         user.setUsername(request.username());
         user.setEmail(request.email());
+        user.setFirstName(request.firstName() == null ? " " : request.firstName());
+        user.setLastName(request.lastName() == null ? " " : request.lastName());
         user.setEnabled(true);
-        user.setEmailVerified(true); // TODO добавить flow подтеверждения emailll сука
+        user.setEmailVerified(true); // TODO добавить flow подтеверждения email
         user.setCredentials(List.of(credential));
         user.setAttributes(Map.of("display_name", List.of(request.username())));
 
