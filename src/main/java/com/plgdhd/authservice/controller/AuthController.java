@@ -6,7 +6,8 @@ import com.plgdhd.authservice.dto.request.RegisterRequest;
 import com.plgdhd.authservice.dto.response.TokenResponse;
 import com.plgdhd.authservice.dto.response.UserInfoResponse;
 import com.plgdhd.authservice.service.AuthService;
-import jakarta.servlet.http.HttpServletRequest;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @Slf4j
 @RequestMapping("/auth")
+@Tag(name = "Контроллер авторизации")
 public class AuthController {
 
     private final AuthService authService;
@@ -30,12 +32,14 @@ public class AuthController {
     }
 
     @PostMapping("/register")
+    @Operation(summary = "Регистрация пользователя")
     public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest registerRequest) {
         String userId = authService.register(registerRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(userId);
     }
 
     @PostMapping("/login")
+    @Operation(summary = "Вход пользователя")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
 
         // Получение Ip для предотвращения брутфорса? －O－
@@ -44,6 +48,7 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
+    @Operation(summary = "Ого рефреш токен")
     public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request){
 
         TokenResponse tokens = authService.refresh(request);
@@ -51,6 +56,7 @@ public class AuthController {
     }
 
     @GetMapping("/me")
+    @Operation(summary = "Получение текущего пользователя по токену")
     public ResponseEntity<UserInfoResponse> getCurrentUser(
             @AuthenticationPrincipal Jwt jwt) {
 

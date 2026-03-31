@@ -1,6 +1,7 @@
 package com.plgdhd.authservice.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -23,15 +24,17 @@ public record RegisterRequest(
         @Size(min = 8, message = "Пароль минимум 8 символов")
         String password,
 
-        // VIEWER — дефолтная роль. Стримером становятся через отдельный процесс.
+        // VIEWER — дефолтная роль. Стримером становятся через отдельный процесс
         @Pattern(regexp = "^(VIEWER|STREAMER)$",
                 message = "Роль должна быть VIEWER или STREAMER")
         String role,
 
         @JsonProperty("first_name")
+        @Schema(description = "Имя пользователя", example = "Василиййййййй")
         String firstName,
 
         @JsonProperty("last_name")
+        @Schema(description = "Фамилия пользователя", example = "Пупкин-Залупкин")
         String lastName
 
 ) {
