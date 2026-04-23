@@ -8,9 +8,9 @@ import com.plgdhd.authservice.dto.response.UserInfoResponse;
 import com.plgdhd.authservice.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,46 +20,57 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @Slf4j
 @RequestMapping("/auth")
-@Tag(name = "Контроллер авторизации")
+@Tag(name = "Auth Controller")
 public class AuthController {
 
     private final AuthService authService;
 
-    @Autowired
     public AuthController(AuthService authService) {
-
         this.authService = authService;
     }
 
     @PostMapping("/register")
-    @Operation(summary = "Регистрация пользователя")
+    @Operation(summary = "Register a new user")
     public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest registerRequest) {
         String userId = authService.register(registerRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(userId);
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Вход пользователя")
-    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
-
-        // Получение Ip для предотвращения брутфорса? －O－
-        TokenResponse tokens = authService.login(request);
-        return ResponseEntity.status(HttpStatus.OK).body(tokens);
+    @Operation(summary = "User login")
+    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request,
+                                               HttpServletRequest httpRequest) {
+        String clientIp = extractClientIp(httpRequest);
+        TokenResponse tokens = authService.login(request, clientIp);
+        return ResponseEntity.ok(tokens);
     }
 
     @PostMapping("/refresh")
-    @Operation(summary = "Ого рефреш токен")
-    public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request){
-
+    @Operation(summary = "Refresh access token")
+    public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         TokenResponse tokens = authService.refresh(request);
-        return ResponseEntity.status(HttpStatus.OK).body(tokens);
+        return ResponseEntity.ok(tokens);
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Logout and revoke tokens")
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal Jwt jwt,
+                                       @RequestBody RefreshTokenRequest request) {
+        authService.logout(jwt, request.refreshToken());
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/me")
-    @Operation(summary = "Получение текущего пользователя по токену")
-    public ResponseEntity<UserInfoResponse> getCurrentUser(
-            @AuthenticationPrincipal Jwt jwt) {
-
+    @Operation(summary = "Get current user info")
+    public ResponseEntity<UserInfoResponse> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(authService.getCurrentUser(jwt));
+    }
+
+    private String extractClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

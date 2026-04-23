@@ -6,11 +6,7 @@ import com.plgdhd.authservice.dto.request.RegisterRequest;
 import com.plgdhd.authservice.dto.response.TokenResponse;
 import com.plgdhd.authservice.dto.response.UserInfoResponse;
 import com.plgdhd.authservice.exception.InvalidCredentialsException;
-import com.plgdhd.authservice.infrastructure.publisher.UserBannedPublisher;
-import com.plgdhd.authservice.infrastructure.publisher.UserRegisteredPublisher;
-import com.plgdhd.authservice.infrastructure.publisher.UserRoleChangedPublisher;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
@@ -28,68 +24,57 @@ public class AuthService {
     private final RateLimitService rateLimitService;
     private final UserEventFacade userEventFacade;
 
-    @Autowired
     public AuthService(KeycloakUserService keycloakUserService,
                        TokenBlackListService tokenBlackListService,
                        RateLimitService rateLimitService,
-                       UserEventFacade userEventFacade){
+                       UserEventFacade userEventFacade) {
         this.keycloakUserService = keycloakUserService;
         this.tokenBlackListService = tokenBlackListService;
         this.rateLimitService = rateLimitService;
         this.userEventFacade = userEventFacade;
     }
 
-    public String register(RegisterRequest request){
-
+    public String register(RegisterRequest request) {
         String userId = keycloakUserService.createUser(request);
-
         userEventFacade.publishUserRegistered(userId, request.email(), request.username(), request.role());
-
-        log.info("Пользователь зарегестрирован успешно: userId={}, role={}", userId, request.role());
+        log.info("User registered successfully: userId={}, role={}", userId, request.role());
         return userId;
     }
 
-    public TokenResponse login(LoginRequest request){
+    public TokenResponse login(LoginRequest request, String clientIp) {
+        rateLimitService.checkLoginRateLimit(clientIp);
 
-//        rateLimitService.checkLoginRateLimit(clientIp);
-
-        try{
+        try {
             TokenResponse tokens = keycloakUserService.login(request.email(), request.password());
-
-//            rateLimitService.resetAttempts(clientIp);
-
-            log.info("Успешный вход: user={}", request.email());
+            rateLimitService.resetAttempts(clientIp);
+            log.info("Successful login: user={}", request.email());
             return tokens;
-        }
-        catch (InvalidCredentialsException ex){
-
-//            rateLimitService.recordFailedAttempt(clientIp);
-
-            log.warn("Неудачная попытка входа: user={}",  request.email());
-            throw  ex;
+        } catch (InvalidCredentialsException ex) {
+            rateLimitService.recordFailedAttempt(clientIp);
+            log.warn("Failed login attempt: user={}", request.email());
+            throw ex;
         }
     }
 
-    public TokenResponse refresh(RefreshTokenRequest request){
+    public TokenResponse refresh(RefreshTokenRequest request) {
         return keycloakUserService.refreshToken(request.refreshToken());
     }
 
-    public void logout(Jwt jwt, String refreshToken){
+    public void logout(Jwt jwt, String refreshToken) {
         String jti = jwt.getId();
         Instant expiresAt = jwt.getExpiresAt();
 
-        if(jti != null && expiresAt != null){
+        if (jti != null && expiresAt != null) {
             tokenBlackListService.addToBlackList(jti, expiresAt);
-            log.debug("Access-токен заблокирован: jti={}", jti);
+            log.debug("Access token blacklisted: jti={}", jti);
         }
 
-        if(refreshToken != null && !refreshToken.isBlank()){
+        if (refreshToken != null && !refreshToken.isBlank()) {
             keycloakUserService.logout(refreshToken);
         }
 
-        log.info("Выполнен выход из аккаунта: userId={}", jwt.getSubject());
+        log.info("User logged out: userId={}", jwt.getSubject());
     }
-
 
     public UserInfoResponse getCurrentUser(Jwt jwt) {
         return new UserInfoResponse(

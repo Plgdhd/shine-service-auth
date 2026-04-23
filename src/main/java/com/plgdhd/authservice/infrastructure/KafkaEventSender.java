@@ -1,7 +1,6 @@
 package com.plgdhd.authservice.infrastructure;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
@@ -11,7 +10,6 @@ public class KafkaEventSender implements EventSender {
 
     private final KafkaTemplate<String, byte[]> kafkaTemplate;
 
-    @Autowired
     public KafkaEventSender(KafkaTemplate<String, byte[]> kafkaTemplate) {
         this.kafkaTemplate = kafkaTemplate;
     }
@@ -20,13 +18,10 @@ public class KafkaEventSender implements EventSender {
     public void send(String topic, String key, byte[] data) {
         kafkaTemplate.send(topic, key, data)
                 .whenComplete((result,ex) -> {
-                    if(ex == null) {
-                        log.info("Регистрация пользователя успешно отправлена в топик {}. Ключ: {}",
-                                topic, key);
-                    }
-                    else{
-                        log.error("Ошибка отправки регистрации пользователя в Kafka (топик {}): {}", topic, ex.getMessage(), ex);
-                        // TODO сделать логику обработки этой ситуации, сейчас 3 ночи и я заебался (X﹏X)
+                    if (ex == null) {
+                        log.info("Event sent to topic {}. Key: {}", topic, key);
+                    } else {
+                        log.error("Failed to send event to Kafka topic {}: {}", topic, ex.getMessage(), ex);
                     }
 
                 });

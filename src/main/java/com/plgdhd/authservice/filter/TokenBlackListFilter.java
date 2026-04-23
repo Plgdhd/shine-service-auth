@@ -7,7 +7,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -26,7 +25,6 @@ public class TokenBlackListFilter extends OncePerRequestFilter {
     private final JwtDecoder jwtDecoder;
     private final ObjectMapper objectMapper;
 
-    @Autowired
     public TokenBlackListFilter(TokenBlackListService tokenBlackListService, JwtDecoder jwtDecoder, ObjectMapper objectMapper) {
         this.tokenBlackListService = tokenBlackListService;
         this.jwtDecoder = jwtDecoder;
@@ -53,8 +51,8 @@ public class TokenBlackListFilter extends OncePerRequestFilter {
             String jti = jwt.getId();
 
             if(jti != null && tokenBlackListService.isBlackListed(jti)){
-                log.warn("Отозванный токен: jti{}, path{}, user{}", jti, request.getRequestURI(), jwt.getSubject());
-                sendUnauthorized(response, request.getRequestURI(), "Токен отозван");
+                log.warn("Revoked token: jti={}, path={}, user={}", jti, request.getRequestURI(), jwt.getSubject());
+                sendUnauthorized(response, request.getRequestURI(), "Token revoked");
                 return;
             }
         }

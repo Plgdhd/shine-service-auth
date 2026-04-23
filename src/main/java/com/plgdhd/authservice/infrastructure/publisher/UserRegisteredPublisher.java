@@ -4,7 +4,6 @@ import com.plgdhd.auth.event.proto.UserRegisteredEvent;
 import com.plgdhd.authservice.infrastructure.EventSender;
 import org.springframework.kafka.support.SendResult;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -21,7 +20,6 @@ public class UserRegisteredPublisher {
     @Value("${app.kafka.topics.user-registered}")
     private String userRegisteredTopic;
 
-    @Autowired
     public UserRegisteredPublisher(EventSender eventSender) {
         this.eventSender = eventSender;
     }

@@ -2,7 +2,6 @@ package com.plgdhd.authservice.infrastructure.publisher;
 
 import com.plgdhd.auth.event.proto.UserRoleChangedEvent;
 import com.plgdhd.authservice.infrastructure.EventSender;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +16,6 @@ public class UserRoleChangedPublisher {
     @Value("${app.kafka.topics.user-role-changed}")
     private String userRoleChangedTopic;
 
-    @Autowired
     public UserRoleChangedPublisher(EventSender eventSender) {
         this.eventSender = eventSender;
     }

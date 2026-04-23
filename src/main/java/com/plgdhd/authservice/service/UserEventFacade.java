@@ -4,7 +4,6 @@ import com.plgdhd.auth.event.proto.UserRegisteredEvent;
 import com.plgdhd.authservice.infrastructure.publisher.UserBannedPublisher;
 import com.plgdhd.authservice.infrastructure.publisher.UserRegisteredPublisher;
 import com.plgdhd.authservice.infrastructure.publisher.UserRoleChangedPublisher;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -16,7 +15,6 @@ public class UserEventFacade {
     private final UserBannedPublisher userBannedPublisher;
     private final UserRoleChangedPublisher userRoleChangedPublisher;
 
-    @Autowired
     public UserEventFacade(UserRegisteredPublisher userRegisteredPublisher,
                            UserBannedPublisher userBannedPublisher,
                            UserRoleChangedPublisher userRoleChangedPublisher){

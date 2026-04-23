@@ -37,3 +37,4 @@ resources/
 /mvnw.cmd
 /.env
 /.mvn/
+/AUTH_SERVICE.md

@@ -1,7 +1,6 @@
 package com.plgdhd.authservice.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +14,6 @@ public class TokenBlackListService {
     private final RedisTemplate<String,String> redisTemplate;
     private static final String BLACKLIST_PREFIX = "auth:blacklist:";
 
-    @Autowired
     public TokenBlackListService(RedisTemplate<String,String> redisTemplate) {
         this.redisTemplate = redisTemplate;
     }

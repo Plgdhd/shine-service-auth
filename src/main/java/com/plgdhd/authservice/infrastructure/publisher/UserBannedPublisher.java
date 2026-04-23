@@ -3,7 +3,6 @@ package com.plgdhd.authservice.infrastructure.publisher;
 import com.plgdhd.auth.event.proto.UserBannedEvent;
 import com.plgdhd.authservice.infrastructure.EventSender;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -19,8 +18,7 @@ public class UserBannedPublisher {
     @Value("${app.kafka.topics.user-banned}")
     private String userBannedTopic;
 
-    @Autowired
-    public  UserBannedPublisher(EventSender eventSender) {
+    public UserBannedPublisher(EventSender eventSender) {
         this.eventSender = eventSender;
     }
 

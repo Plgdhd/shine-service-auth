@@ -1,13 +1,9 @@
 package com.plgdhd.authservice.config;
 
 import com.plgdhd.authservice.filter.TokenBlackListFilter;
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -30,33 +26,31 @@ import java.util.stream.Collectors;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    public final TokenBlackListFilter tokenBlackListFilter;
+    private final TokenBlackListFilter tokenBlackListFilter;
 
-    @Autowired
     public SecurityConfig(TokenBlackListFilter tokenBlackListFilter) {
         this.tokenBlackListFilter = tokenBlackListFilter;
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s ->
                         s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth->auth
+                .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/error").permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN") //TODO сделал на перспективу, потом реализую
-
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
-
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())
-                ))
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                )
                 .addFilterBefore(tokenBlackListFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
@@ -69,13 +63,10 @@ public class SecurityConfig {
         return converter;
     }
 
-    /** Нужен для того, чтобы преобразовать роли из Keycloak
-        в роли поддерживаемые спрингом
-    */
     @SuppressWarnings("unchecked")
     private Collection<GrantedAuthority> extractAuthorities(Jwt jwt) {
         Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
-        if(realmAccess == null || !realmAccess.containsKey("roles")) {
+        if (realmAccess == null || !realmAccess.containsKey("roles")) {
             return List.of();
         }
 
@@ -84,7 +75,7 @@ public class SecurityConfig {
                 .filter(r -> !r.startsWith("default-roles-")
                         && !r.equals("offline_access")
                         && !r.equals("uma_authorization"))
-                .map(r -> new SimpleGrantedAuthority("ROLE_"+r))
+                .map(r -> new SimpleGrantedAuthority("ROLE_" + r))
                 .collect(Collectors.toList());
     }
 }

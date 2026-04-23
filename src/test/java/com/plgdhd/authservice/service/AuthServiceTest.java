@@ -5,24 +5,13 @@ import com.plgdhd.authservice.dto.request.RegisterRequest;
 import com.plgdhd.authservice.dto.response.TokenResponse;
 import com.plgdhd.authservice.exception.InvalidCredentialsException;
 import com.plgdhd.authservice.exception.UserAlreadyExistsException;
-import lombok.extern.java.Log;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.common.metrics.stats.Rate;
-import org.apache.kafka.common.security.auth.Login;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import java.time.Instant;
 
@@ -32,14 +21,13 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@ActiveProfiles("test")
 public class AuthServiceTest {
 
     @Mock
     KeycloakUserService keycloakUserService;
 
     @Mock
-    UserEventFacade  userEventFacade;
+    UserEventFacade userEventFacade;
 
     @Mock
     TokenBlackListService tokenBlackListService;
@@ -47,20 +35,18 @@ public class AuthServiceTest {
     @Mock
     RateLimitService rateLimitService;
 
-    @Mock
-    private JwtDecoder jwtDecoder;
-
     @InjectMocks
     AuthService authService;
 
-    @Test
-    @DisplayName("register: проверка успешной регистрации")
-    void register_success(){
+    private static final String CLIENT_IP = "127.0.0.1";
 
+    @Test
+    @DisplayName("register: successful registration")
+    void register_success() {
         RegisterRequest request = new RegisterRequest("user@test.com", "test", "test", "VIEWER", "first", "last");
         when(keycloakUserService.createUser(request)).thenReturn("user-uuid-1");
 
-        String userId  = authService.register(request);
+        String userId = authService.register(request);
 
         assertThat(userId).isEqualTo("user-uuid-1");
 
@@ -73,51 +59,53 @@ public class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("register: если email занят")
+    @DisplayName("register: duplicate email throws exception")
     void register_duplicateEmail_throwsException() {
         RegisterRequest request = new RegisterRequest("user@test.com", "test", "test", "VIEWER", "first", "last");
         when(keycloakUserService.createUser(request))
-                .thenThrow(new UserAlreadyExistsException("Email уже занят"));
+                .thenThrow(new UserAlreadyExistsException("Email already taken"));
 
         assertThatThrownBy(() -> authService.register(request))
                 .isInstanceOf(UserAlreadyExistsException.class)
-                .hasMessageContaining("Email уже занят");
+                .hasMessageContaining("Email already taken");
 
         verifyNoInteractions(userEventFacade);
     }
 
     @Test
     @DisplayName("login: success")
-    void login_success(){
+    void login_success() {
         LoginRequest request = new LoginRequest("user@test.com", "test");
         TokenResponse expectedTokens = TokenResponse.of("access-jwt", "refresh-jwt", 300L, 1800L);
 
         when(keycloakUserService.login("user@test.com", "test")).thenReturn(expectedTokens);
 
-        TokenResponse result = authService.login(request);
+        TokenResponse result = authService.login(request, CLIENT_IP);
 
         assertThat(result.accessToken()).isEqualTo("access-jwt");
         assertThat(result.tokenType()).isEqualTo("Bearer");
 
-        //TODO rate limit service testing
+        verify(rateLimitService).checkLoginRateLimit(CLIENT_IP);
+        verify(rateLimitService).resetAttempts(CLIENT_IP);
     }
 
     @Test
-    @DisplayName("login: wrong password")
-    void login_wrong_password(){
-
+    @DisplayName("login: wrong password records failed attempt")
+    void login_wrong_password() {
         LoginRequest request = new LoginRequest("user@test.com", "wrong");
 
         when(keycloakUserService.login(request.email(), request.password()))
                 .thenThrow(new InvalidCredentialsException());
 
-        assertThatThrownBy(() -> authService.login(request)).
-                isInstanceOf(InvalidCredentialsException.class);
-        //TODO rate limiter service testing too
+        assertThatThrownBy(() -> authService.login(request, CLIENT_IP))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        verify(rateLimitService).checkLoginRateLimit(CLIENT_IP);
+        verify(rateLimitService).recordFailedAttempt(CLIENT_IP);
     }
 
     @Test
-    @DisplayName("logout: добавляет токен в blacklist и отзывает refresh_token")
+    @DisplayName("logout: blacklists token and revokes refresh token")
     void logout_addsToBlacklistAndRevokesRefresh() {
         Jwt jwt = mockJwt("jti-abc-123", "user-uuid-456", Instant.now().plusSeconds(300));
 
@@ -127,9 +115,8 @@ public class AuthServiceTest {
         verify(keycloakUserService).logout("some-refresh-token");
     }
 
-
     @Test
-    @DisplayName("logout: без refresh_token. только blacklist, Keycloak не вызывается")
+    @DisplayName("logout: without refresh token only blacklists")
     void logout_withoutRefreshToken_onlyBlacklist() {
         Jwt jwt = mockJwt("jti-xyz", "user-id", Instant.now().plusSeconds(60));
 

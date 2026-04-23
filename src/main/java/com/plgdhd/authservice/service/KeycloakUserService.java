@@ -13,7 +13,6 @@ import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -31,43 +30,38 @@ public class KeycloakUserService {
 
     private final Keycloak keycloakAdminClient;
     private final KeycloakProperties properties;
+    private final WebClient webClient;
 
-    // TODO подумать на этим
-    private final WebClient webClient = WebClient.create();
-
-    @Autowired
-    public KeycloakUserService(Keycloak keycloakAdminClient, KeycloakProperties properties) {
+    public KeycloakUserService(Keycloak keycloakAdminClient,
+                               KeycloakProperties properties,
+                               WebClient webClient) {
         this.properties = properties;
-        this.keycloakAdminClient =  keycloakAdminClient;
+        this.keycloakAdminClient = keycloakAdminClient;
+        this.webClient = webClient;
     }
 
-    public String createUser(RegisterRequest request){
-
+    public String createUser(RegisterRequest request) {
         RealmResource realmResource = keycloakAdminClient.realm(properties.realm());
 
         UserRepresentation user = buildUserRepresentation(request);
         Response response = realmResource.users().create(user);
 
-        log.debug("Create user to keycloak: status{}", response.getStatus());
+        log.debug("Create user in keycloak: status={}", response.getStatus());
 
         if (response.getStatus() == HttpStatus.CONFLICT.value()) {
-            throw new UserAlreadyExistsException("Пользователь с таким именем/email уже существует");
+            throw new UserAlreadyExistsException("User with this username/email already exists");
         }
 
-        if(response.getStatus() != HttpStatus.CREATED.value()){
+        if (response.getStatus() != HttpStatus.CREATED.value()) {
             String body = response.readEntity(String.class);
-            throw new KeycloakException("Ошибка создания пользователя, status= " + response.getStatus()
-                    + " body= " + body);
+            throw new KeycloakException("Failed to create user, status=" + response.getStatus()
+                    + " body=" + body);
         }
 
-        /*
-        Как выглядит ответ присылаемый keycloak? OwO
-        Переделать потом возможно
-         */
         String location = response.getHeaderString("Location");
         String userId = location.substring(location.lastIndexOf("/") + 1);
 
-        log.info("Пользователь успешно создан в keycloak, userId={} username={} ", userId, request.username());
+        log.info("User created in keycloak: userId={}, username={}", userId, request.username());
 
         assignRealmRole(realmResource, userId, properties.defaultUserRole());
 
@@ -75,7 +69,6 @@ public class KeycloakUserService {
     }
 
     private UserRepresentation buildUserRepresentation(RegisterRequest request) {
-
         CredentialRepresentation credential = new CredentialRepresentation();
         credential.setType(CredentialRepresentation.PASSWORD);
         credential.setValue(request.password());
@@ -84,8 +77,8 @@ public class KeycloakUserService {
         UserRepresentation user = new UserRepresentation();
         user.setUsername(request.username());
         user.setEmail(request.email());
-        user.setFirstName(request.firstName() == null ? " " : request.firstName());
-        user.setLastName(request.lastName() == null ? " " : request.lastName());
+        user.setFirstName(request.firstName() != null ? request.firstName() : "");
+        user.setLastName(request.lastName() != null ? request.lastName() : "");
         user.setEnabled(true);
         user.setEmailVerified(true); // TODO добавить flow подтеверждения email
         user.setCredentials(List.of(credential));
@@ -98,20 +91,18 @@ public class KeycloakUserService {
     private void assignRealmRole(RealmResource realmResource, String userId, String roleName){
         try{
             RoleRepresentation role = realmResource.roles().get(roleName).toRepresentation();
-
             realmResource.users().get(userId).roles().realmLevel().add(List.of(role));
-            log.debug("Пользователю {} выдана роль: {}", userId, roleName);
-        }
-        catch (Exception e){
-            throw new KeycloakException("Не удалось назвачить роль: " + roleName, e);
+            log.debug("Role {} assigned to user {}", roleName, userId);
+        } catch (Exception e) {
+            throw new KeycloakException("Failed to assign role: " + roleName, e);
         }
     }
 
-    public TokenResponse login(String email, String password){
+    public TokenResponse login(String email, String password) {
         String tokenUrl = properties.authServerUrl() + "/realms/" + properties.realm()
                 + "/protocol/openid-connect/token";
 
-        try{
+        try {
             TokenResponse response = webClient.post()
                     .uri(tokenUrl)
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -124,30 +115,26 @@ public class KeycloakUserService {
                     )
                     .retrieve()
                     .bodyToMono(TokenResponse.class)
-                    .cache()
                     .block();
 
-            if(response == null){
-                throw new KeycloakException("Пустой ответ при входе пользователя в Keycloak");
+            if (response == null) {
+                throw new KeycloakException("Empty response from Keycloak during login");
             }
 
             return response;
-        }
-        catch (WebClientResponseException e){
-            if(e.getStatusCode() == HttpStatus.UNAUTHORIZED){
+        } catch (WebClientResponseException e) {
+            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
                 throw new InvalidCredentialsException();
             }
-            throw new KeycloakException("Ошибка логина: " + e.getMessage(), e);
+            throw new KeycloakException("Login error: " + e.getMessage(), e);
         }
     }
 
-    public TokenResponse refreshToken(String refreshToken){
-
+    public TokenResponse refreshToken(String refreshToken) {
         String tokenUrl = properties.authServerUrl() + "/realms/" + properties.realm()
                 + "/protocol/openid-connect/token";
 
-        try{
-
+        try {
             TokenResponse response = webClient.post()
                     .uri(tokenUrl)
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -158,31 +145,26 @@ public class KeycloakUserService {
                     )
                     .retrieve()
                     .bodyToMono(TokenResponse.class)
-                    .cache() // а есть ли смысл в кешировании? (￣┰￣*)
                     .block();
 
-            if(response == null){
-                throw new KeycloakException("При получении refresh токена пришел пустой ответ");
+            if (response == null) {
+                throw new KeycloakException("Empty response from Keycloak during token refresh");
             }
 
             return response;
-        }
-        catch (WebClientResponseException e) {
-            if(e.getStatusCode() == HttpStatus.UNAUTHORIZED){
+        } catch (WebClientResponseException e) {
+            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
                 throw new InvalidCredentialsException();
             }
-            throw new KeycloakException("Ошибка получения refresh токена: " + e.getMessage(), e);
+            throw new KeycloakException("Token refresh error: " + e.getMessage(), e);
         }
-
     }
 
-    // отзывает refreshToken из Keycloak
-    // TODO прикрутить Redis?
-    public void logout(String refreshToken){
+    public void logout(String refreshToken) {
         String tokenUrl = properties.authServerUrl() + "/realms/" + properties.realm()
                 + "/protocol/openid-connect/logout";
 
-        try{
+        try {
             webClient.post()
                     .uri(tokenUrl)
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -192,15 +174,13 @@ public class KeycloakUserService {
                     .retrieve()
                     .bodyToMono(Void.class)
                     .block();
-        }
-        catch (WebClientResponseException e){
-            log.warn("Ошибка logout, возможно refresh-токен недействиетелен");
+        } catch (WebClientResponseException e) {
+            log.warn("Logout error, refresh token may be invalid: {}", e.getMessage());
         }
     }
 
-    public Optional<UserRepresentation> findUserById(String userId){
-
-        try{
+    public Optional<UserRepresentation> findUserById(String userId) {
+        try {
             return Optional.ofNullable(
                     keycloakAdminClient.realm(properties.realm()).users().get(userId).toRepresentation()
             );
@@ -209,9 +189,8 @@ public class KeycloakUserService {
         }
     }
 
-    public void invalidateAllUserSessions(String userId){
+    public void invalidateAllUserSessions(String userId) {
         keycloakAdminClient.realm(properties.realm()).users().get(userId).logout();
-        log.info("Все сессии пользователя {} инвалидированы", userId);
+        log.info("All sessions invalidated for user {}", userId);
     }
-
 }
